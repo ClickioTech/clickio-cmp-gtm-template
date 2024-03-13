@@ -35,7 +35,7 @@ ___TEMPLATE_PARAMETERS___
     "name": "wait_for_update",
     "simpleValueType": true,
     "defaultValue": 1500,
-    "displayName": "Wait for update"
+    "displayName": "Wait for update (ms)"
   },
   {
     "type": "CHECKBOX",
