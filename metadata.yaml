@@ -1,5 +1,5 @@
 homepage: "https://clickio.com/"
 documentation: "https://docs.clickio.com/books/clickio-consent-cmp"
 versions:
-  - sha: d5ba350c2f76f4f266a6f0611caa7a5a73c6a352
+  - sha: 52885722c319c1f15f01ff53a3ea048550b9a938
     changeNotes: Initial release.
