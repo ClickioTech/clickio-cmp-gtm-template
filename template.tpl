@@ -114,7 +114,7 @@ ___SANDBOXED_JS_FOR_WEB_TEMPLATE___
         security_storage: "denied",
         ad_user_data:            "denied",
         ad_personalization:      "denied",
-        wait_for_update: data.wait_for_update
+        wait_for_update: data.wait_for_update-0
     });
 
     /* Setting gtag values */
