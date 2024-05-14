@@ -2,8 +2,17 @@ homepage: "https://clickio.com/"
 documentation: "https://docs.clickio.com/books/clickio-consent-cmp"
 versions:
   # Latest version
+  - sha: 044ae440f8a23ea99d9b30c546d1f78bffe621a3
+    changeNotes: |2
+      Enabled injection of the main Consent script
+      Implemented a global toggle for enabling Consent Mode
+      Introduced a consent scope switch, changing the logic of standard defaults
+      Enabled overriding of defaults by individual regions and globally
+      Passed through developer_id
+      Created unit tests
+      Implemented debug logs
+  # Older versions
   - sha: bb34613472f91570fc66c5487a046b22fa28c94c
     changeNotes: Undefined variable fixed.
-  # Older versions
   - sha: 52885722c319c1f15f01ff53a3ea048550b9a938
     changeNotes: Initial release.
