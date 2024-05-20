@@ -316,11 +316,6 @@ ___TEMPLATE_PARAMETERS___
 ___SANDBOXED_JS_FOR_WEB_TEMPLATE___
 
 (function () {
-    /* Function to check the existence of a variable */
-    function checkExistence(inputVariable) {
-        return "undefined" != typeof inputVariable ? inputVariable : !1;
-    }
-
     /* Definition of storage items */
     const storageItems = {
         adStorage: {
@@ -353,52 +348,111 @@ ___SANDBOXED_JS_FOR_WEB_TEMPLATE___
         }
     };
 
+    /* Consent applicable countries list */
+    const consentApplicableCountries = [
+        'AT',
+        'BE',
+        'BG',
+        'HR',
+        'CY',
+        'CZ',
+        'DK',
+        'EE',
+        'FI',
+        'FR',
+        'DE',
+        'GR',
+        'HU',
+        'IS',
+        'IE',
+        'IT',
+        'LV',
+        'LI',
+        'LT',
+        'LU',
+        'MT',
+        'NL',
+        'NO',
+        'PL',
+        'PT',
+        'RO',
+        'SK',
+        'SI',
+        'ES',
+        'SE',
+        'UK',
+        'CH'
+    ];
+
+    /* Default settings object */
+    const defaultSettings = {
+        wait_for_update: data.wait_for_update-0
+    };
+
     /* Importing required modules */
     const localStorage           = require("localStorage"),
           objectModule           = require("Object"),
           gtagSet                = require("gtagSet"),
           setDefaultConsentState = require("setDefaultConsentState"),
           updateConsentState     = require("updateConsentState"),
-          logToConsole           = require("logToConsole"),
-          setInWindow            = require("setInWindow"),
-          injectScript           = require("injectScript"),
-          copyFromWindow         = require("copyFromWindow"),
           getContainerVersion    = require("getContainerVersion");
 
-    /* Setting up constants */
-    const urlPassthrough   = true === data.url_passthrough,
-          adsDataRedaction = true === data.ads_data_redaction ? true : "denied",
-          regionSettings = data.regionSettings || [],
-          debugMode = getContainerVersion().debugMode;
+    //<editor-fold desc="Utils">
+    /* Function to check the existence of a variable */
+    function checkExistence(inputVariable) {
+        return "undefined" != typeof inputVariable ? inputVariable : !1;
+    }
 
-    /* Parse comma-separated regions into an array */
-    const parseRegions = (regions) => {
-        return regions.split(',')
-                      .map(r => r.trim())
-                      .filter(r => r !== '');
-    };
-  
     /* Checks if a variable is an array and not empty */
     const isArrayAndNotEmpty = (obj) => {
         return obj && typeof obj === 'object' && obj.length > 0;
     };
-  
+
+    let JSON;
+    const clone = (obj) => {
+        if (!JSON) {
+            JSON = require('JSON');
+        }
+
+        return JSON.parse(JSON.stringify(obj));
+    };
+
+    /* Apply callback to the available options list */
+    const mapOptionsList = (callback) => {
+        for (let key in storageItems) {
+            if (storageItems.hasOwnProperty(key)) {
+                callback(storageItems[key].storageName);
+            }
+        }
+    };
+
+    const createSettings = (accessMode) => {
+        let settings = clone(defaultSettings);
+
+        mapOptionsList(optionName => settings[optionName] = accessMode);
+
+        return settings;
+    };
+    //</editor-fold>
+
+    /* Setting up constants */
+    const urlPassthrough   = true === data.url_passthrough,
+          adsDataRedaction = true === data.ads_data_redaction ? true : "denied",
+          debugMode        = getContainerVersion().debugMode;
+
+    /*  Debug output */
+    const dbg = debugMode ? require("logToConsole") : () => {};
+
     /* Fetches consent settings from a region configuration */
-    const fetchConsentSettings = (regionConfig) => {
-        const settings = {
-            functionality_storage: regionConfig.functionality_storage || 'denied',
-            personalization_storage: regionConfig.personalization_storage || 'denied',
-            analytics_storage: regionConfig.analytics_storage || 'denied',
-            security_storage: regionConfig.security_storage || 'denied',
-            ad_storage: regionConfig.ad_storage || 'denied',
-            ad_user_data: regionConfig.ad_user_data || 'denied',
-            ad_personalization: regionConfig.ad_personalization || 'denied',
-            wait_for_update: data.wait_for_update-0
-        };
+    const processRegionConsentSettings = (regionConfig) => {
+        const settings = clone(defaultSettings);
+
+        mapOptionsList(optionName => settings[optionName] = regionConfig[optionName] || 'denied');
 
         // Process the regions if provided
         if (regionConfig.region) {
-            const regionsArray = parseRegions(regionConfig.region);
+            const regionsArray = regionConfig.region.split(',').map(r => r.trim()).filter(r => r !== '');
+
             if (regionsArray.length) {
                 settings.region = regionsArray;
             }
@@ -406,122 +460,136 @@ ___SANDBOXED_JS_FOR_WEB_TEMPLATE___
 
         return settings;
     };
-    
-    const grantedSettings = {
-        functionality_storage: 'granted',
-        personalization_storage: 'granted',
-        analytics_storage: 'granted',
-        security_storage: 'granted', 
-        ad_storage: 'granted',
-        ad_user_data: 'granted',
-        ad_personalization: 'granted',
-        wait_for_update: data.wait_for_update - 0
-    };
 
-    const deniedSettings = {
-        functionality_storage: 'denied',
-        personalization_storage: 'denied',
-        analytics_storage: 'denied',
-        security_storage: 'denied', 
-        ad_storage: 'denied',
-        ad_user_data: 'denied',
-        ad_personalization: 'denied',
-        wait_for_update: data.wait_for_update - 0
-    };
-    
-    const eeaCountries = ['AT', 'BE', 'BG', 'HR', 'CY', 'CZ', 'DK', 'EE', 'FI', 'FR', 'DE', 'GR', 'HU', 'IS', 'IE', 'IT', 'LV', 'LI', 'LT', 'LU', 'MT', 'NL', 'NO', 'PL', 'PT', 'RO', 'SK', 'SI', 'ES', 'SE', 'UK', 'CH'];
-  
+    const grantedSettings = createSettings('granted');
+    const deniedSettings  = createSettings('denied');
+
     /* Manual copying of settings with specific countries for EEA, including UK and Switzerland (CH) */
-    const createEEAUKSettings = () => {
-        return {
-            functionality_storage: 'denied',
-            personalization_storage: 'denied',
-            analytics_storage: 'denied',
-            security_storage: 'denied',
-            ad_storage: 'denied',
-            ad_user_data: 'denied',
-            ad_personalization: 'denied',
-            wait_for_update: data.wait_for_update - 0,
-            region: eeaCountries
-        };
+    const createGeoAwareSettings = () => {
+        let settings = clone(deniedSettings);
+
+        settings.region = consentApplicableCountries;
+
+        return settings;
     };
 
     /* Check and apply region-specific or default consent settings */
     const applyConsentSettings = () => {
-        let baseSettings = deniedSettings; // Default to denied settings
-      
         if (data.consentScope === 'eea_uk') {
-            const settingsEEAUK = createEEAUKSettings();
+            const settingsEEAUK = createGeoAwareSettings();
+
             setDefaultConsentState(grantedSettings); // Apply granted settings globally
-            setDefaultConsentState(settingsEEAUK); // Apply EEA/UK-specific denied settings
-            if (debugMode) {logToConsole("Applying EEA and UK-specific denied settings and granted settings for other regions.");}
-        } else { // 'all' case
+            setDefaultConsentState(settingsEEAUK);   // Apply EEA/UK-specific denied settings
+
+            dbg("Applying EEA and UK-specific denied settings and granted settings for other regions.");
+        } else {
+            // 'all' case
             setDefaultConsentState(deniedSettings); // Apply denied settings globally
-            if (debugMode) {logToConsole("Applying global denied default settings.");}
+
+            dbg("Applying global denied default settings.");
         }
 
         // Handle regionless entry if it exists in data.defaultSettings
         if (isArrayAndNotEmpty(data.defaultSettings)) {
+            let baseSettings      = clone(deniedSettings); // Default to denied settings
             const regionlessEntry = data.defaultSettings.filter(entry => !entry.region || entry.region.trim() === '')[0];
+
             if (regionlessEntry) {
-                baseSettings = fetchConsentSettings(regionlessEntry);
-                if (debugMode) {logToConsole("Applying base settings from regionless entry:", baseSettings);}
+                baseSettings = processRegionConsentSettings(regionlessEntry);
+
+                dbg("Applying base settings from regionless entry:", baseSettings);
+
                 setDefaultConsentState(baseSettings);
             }
 
             data.defaultSettings.forEach(config => {
                 if (config.region && config.region.trim() !== '') {
-                    const consentSettings = fetchConsentSettings(config);
+                    let consentSettings = processRegionConsentSettings(config);
+
                     setDefaultConsentState(consentSettings);
-                    if (debugMode) {logToConsole("Applying settings for region", config.region, consentSettings);}
+
+                    dbg("Applying settings for region", config.region, consentSettings);
                 }
             });
         } else {
-            if (debugMode) {logToConsole("DefaultSettings array is invalid or empty, applying default settings");}
+            dbg("DefaultSettings array is invalid or empty");
         }
     };
-    
-    if (data.enableConsentMode) {  
-        /* Apply default consent settings */
-        applyConsentSettings();
-    
-        /* Setting gtag values */
-        gtagSet({'ads_data_redaction': adsDataRedaction,
-                'url_passthrough': urlPassthrough,
+
+    const init = () => {
+        if (data.enableConsentMode) {
+            dbg("Consent mode enabled, initializing logic");
+
+            /* Apply default consent settings */
+            applyConsentSettings();
+
+            /* Setting gtag values */
+            gtagSet({
+                'ads_data_redaction':   adsDataRedaction,
+                'url_passthrough':      urlPassthrough,
                 'developer_id.dNjAwZj': true
-                });
-    
-        /* Retrieving consent data from local storage */
-        let consentData = localStorage.getItem("__lxG__consent__v2");
+            });
 
-        /* Checking and processing consent data */
-        if (consentData) {
-            consentData = consentData.split("|");
-            if (consentData.length && checkExistence(consentData[14])) {
-                consentData = consentData[14].split("").map(function (consentItem) { return consentItem-0; });
+            /* Retrieving consent data from local storage */
+            let consentData = localStorage.getItem("__lxG__consent__v2");
 
-                if (consentData.length) {
-                    let consentObject = {};
+            /* Checking and processing existing consent data */
+            if (consentData) {
+                consentData = JSON.parse(consentData);
 
-                    objectModule.values(storageItems).sort(function (storageItem1, storageItem2) {
-                        return storageItem1.serialNumber-storageItem2.serialNumber;
-                    }).forEach(function (storageItem) {
-                        consentObject[storageItem.storageName] = checkExistence(consentData[storageItem.serialNumber]) ? "granted" : "denied";
-                    });
-                    updateConsentState(consentObject);
+                if (consentData && consentData.cls_val) {
+                    consentData = consentData.cls_val;
                 }
+
+                if (consentData) {
+                    consentData = consentData.split("|");
+                }
+
+                if (consentData && consentData.length && checkExistence(consentData[14])) {
+                    dbg("Processing existing consent data: "+consentData[14]+"");
+
+                    consentData = consentData[14].split("").map(consentItem => consentItem-0);
+
+                    if (consentData.length) {
+                        let consentObject = {};
+
+                        objectModule.values(storageItems).sort(function (storageItem1, storageItem2) {
+                            return storageItem1.serialNumber-storageItem2.serialNumber;
+                        }).forEach(function (storageItem) {
+                            consentObject[storageItem.storageName] = checkExistence(consentData[storageItem.serialNumber]) ? "granted" : "denied";
+                        });
+
+                        updateConsentState(consentObject);
+                    }
+                } else {
+                    dbg("Malformed consent data found, skipping");
+                }
+            } else {
+                dbg("Existing consent data not found");
             }
+        } else {
+            dbg("Consent mode disabled");
         }
-    }
 
-    /* Inject Clickio CMP script */
-    if (data.includeClickioCmpCode){
-      var scriptUrl = 'https://clickiocmp.com/t/consent_'+data.clickioSiteId+'.js';
-      injectScript(scriptUrl);
-    }
+        /* Inject Clickio CMP script */
+        if (data.includeClickioCmpCode && data.clickioSiteId) {
+            dbg("Injecting Clickio CMP script for clickioSiteId: "+data.clickioSiteId+"");
 
-    /* Calling success callback */
-    data.gtmOnSuccess();
+            const injectScript = require("injectScript");
+
+            injectScript('https://clickiocmp.com/t/consent_'+data.clickioSiteId+'.js');
+        } else if (data.includeClickioCmpCode && !data.clickioSiteId) {
+            dbg("Please specify data.clickioSiteId to inject the Clickio CMP script");
+        } else {
+            dbg("Not injecting Clickio CMP script");
+        }
+
+        /* Calling success callback */
+        dbg("Calling gtmOnSuccess callback");
+        data.gtmOnSuccess();
+    };
+
+    init();
 })();
 
 
@@ -840,7 +908,69 @@ ___WEB_PERMISSIONS___
                   },
                   {
                     "type": 8,
-                    "boolean": false
+                    "boolean": true
+                  }
+                ]
+              },
+              {
+                "type": 3,
+                "mapKey": [
+                  {
+                    "type": 1,
+                    "string": "key"
+                  },
+                  {
+                    "type": 1,
+                    "string": "read"
+                  },
+                  {
+                    "type": 1,
+                    "string": "write"
+                  }
+                ],
+                "mapValue": [
+                  {
+                    "type": 1,
+                    "string": "__lxG__consent__v2_daisybit"
+                  },
+                  {
+                    "type": 8,
+                    "boolean": true
+                  },
+                  {
+                    "type": 8,
+                    "boolean": true
+                  }
+                ]
+              },
+              {
+                "type": 3,
+                "mapKey": [
+                  {
+                    "type": 1,
+                    "string": "key"
+                  },
+                  {
+                    "type": 1,
+                    "string": "read"
+                  },
+                  {
+                    "type": 1,
+                    "string": "write"
+                  }
+                ],
+                "mapValue": [
+                  {
+                    "type": 1,
+                    "string": "__lxG__consent__v2_gdaisybit"
+                  },
+                  {
+                    "type": 8,
+                    "boolean": true
+                  },
+                  {
+                    "type": 8,
+                    "boolean": true
                   }
                 ]
               }
@@ -866,67 +996,6 @@ ___WEB_PERMISSIONS___
           "value": {
             "type": 1,
             "string": "debug"
-          }
-        }
-      ]
-    },
-    "clientAnnotations": {
-      "isEditedByUser": true
-    },
-    "isRequired": true
-  },
-  {
-    "instance": {
-      "key": {
-        "publicId": "access_globals",
-        "versionId": "1"
-      },
-      "param": [
-        {
-          "key": "keys",
-          "value": {
-            "type": 2,
-            "listItem": [
-              {
-                "type": 3,
-                "mapKey": [
-                  {
-                    "type": 1,
-                    "string": "key"
-                  },
-                  {
-                    "type": 1,
-                    "string": "read"
-                  },
-                  {
-                    "type": 1,
-                    "string": "write"
-                  },
-                  {
-                    "type": 1,
-                    "string": "execute"
-                  }
-                ],
-                "mapValue": [
-                  {
-                    "type": 1,
-                    "string": "gtag_enable_tcf_support"
-                  },
-                  {
-                    "type": 8,
-                    "boolean": true
-                  },
-                  {
-                    "type": 8,
-                    "boolean": true
-                  },
-                  {
-                    "type": 8,
-                    "boolean": false
-                  }
-                ]
-              }
-            ]
           }
         }
       ]
@@ -1028,6 +1097,24 @@ scenarios:
     \        ad_storage: 'denied',\n        ad_user_data: 'denied',\n        ad_personalization:\
     \ 'denied',\n        wait_for_update: 1500,\n        region: ['RS', 'UK']\n  \
     \  });\n\nassertApi('gtmOnSuccess').wasCalled();"
+- name: local storage reading
+  code: |-
+    mockData.consentScope = 'all';
+    mockData.defaultSettings = null;
+    mockData.enableConsentMode = true;
+    mockData.includeClickioCmpCode = true;
+    mockData.clickioSiteId = 235841;
+
+    const localStorage = require('localStorage');
+    localStorage.setItem("__lxG__consent__v2", '{"cls_val":"1|1715960648|1715960648292|0|1723736648292|0|0|0|1715960648292|0|17159606459671888|1|1|164B|1111111|1B2B3B4B5B6B|2","cls_ttl":1749656648292}');
+
+    // Call runCode to run the template's code.
+    runCode(mockData);
+
+    // Verify that the tag finished successfully.
+    assertApi('updateConsentState').wasCalled();
+
+    assertApi('gtmOnSuccess').wasCalled();
 setup: |-
   // Mock data setup as a simplified example
   var mockData = {
