@@ -2,6 +2,11 @@ homepage: "https://clickio.com/"
 documentation: "https://docs.clickio.com/books/clickio-consent-cmp"
 versions:
   # Latest version
+  - sha: 0fdd2e97529e95f4e82362b6404bbdbdb7637a86
+    changeNotes: |2
+      Code refactoring
+      Added localStorage unit test
+  # Older versions
   - sha: 044ae440f8a23ea99d9b30c546d1f78bffe621a3
     changeNotes: |2
       Enabled injection of the main Consent script
@@ -11,7 +16,6 @@ versions:
       Passed through developer_id
       Created unit tests
       Implemented debug logs
-  # Older versions
   - sha: bb34613472f91570fc66c5487a046b22fa28c94c
     changeNotes: Undefined variable fixed.
   - sha: 52885722c319c1f15f01ff53a3ea048550b9a938
