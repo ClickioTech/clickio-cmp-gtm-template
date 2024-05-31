@@ -2,11 +2,13 @@ homepage: "https://clickio.com/"
 documentation: "https://docs.clickio.com/books/clickio-consent-cmp"
 versions:
   # Latest version
+  - sha: 26648fd8b9e3b2fc4893a9e22c1006aaced49862
+    changeNotes: Changed country alias
+  # Older versions
   - sha: 0fdd2e97529e95f4e82362b6404bbdbdb7637a86
     changeNotes: |2
       Code refactoring
       Added localStorage unit test
-  # Older versions
   - sha: 044ae440f8a23ea99d9b30c546d1f78bffe621a3
     changeNotes: |2
       Enabled injection of the main Consent script
