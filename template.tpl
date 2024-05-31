@@ -380,7 +380,7 @@ ___SANDBOXED_JS_FOR_WEB_TEMPLATE___
         'SI',
         'ES',
         'SE',
-        'UK',
+        'GB',
         'CH'
     ];
 
