@@ -1061,7 +1061,7 @@ scenarios:
     \ 'denied',\n        wait_for_update: 1500,\n        region: ['AT', 'BE', 'BG',\
     \ 'HR', 'CY', 'CZ', 'DK', 'EE', 'FI', 'FR', 'DE', 'GR', 'HU', 'IS', 'IE', 'IT',\
     \ 'LV', 'LI', 'LT', 'LU', 'MT', 'NL', 'NO', 'PL', 'PT', 'RO', 'SK', 'SI', 'ES',\
-    \ 'SE', 'UK', 'CH']\n    });\n\nassertApi('gtmOnSuccess').wasCalled();"
+    \ 'SE', 'GB', 'CH']\n    });\n\nassertApi('gtmOnSuccess').wasCalled();"
 - name: scope all - defaults
   code: "mockData.consentScope = 'all';\nmockData.defaultSettings = null;\nmockData.enableConsentMode\
     \ = true;\n\n// Call runCode to run the template's code.\nrunCode(mockData);\n\
