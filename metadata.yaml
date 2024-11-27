@@ -2,9 +2,11 @@ homepage: "https://clickio.com/"
 documentation: "https://docs.clickio.com/books/clickio-consent-cmp"
 versions:
   # Latest version
+  - sha: 52151e9d604066e354e4e173c47d25445c876bf2
+    changeNotes: Update for eea_uk test
+  # Older versions
   - sha: 26648fd8b9e3b2fc4893a9e22c1006aaced49862
     changeNotes: Changed country alias
-  # Older versions
   - sha: 0fdd2e97529e95f4e82362b6404bbdbdb7637a86
     changeNotes: |2
       Code refactoring
