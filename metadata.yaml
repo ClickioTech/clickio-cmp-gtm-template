@@ -2,9 +2,11 @@ homepage: "https://clickio.com/"
 documentation: "https://docs.clickio.com/books/clickio-consent-cmp"
 versions:
   # Latest version
+  - sha: b315dc41ef99e443fdaa64d6c400fee4538c98c7
+    changeNotes: Add Microsoft UET consent mode support
+  # Older versions
   - sha: 52151e9d604066e354e4e173c47d25445c876bf2
     changeNotes: Update for eea_uk test
-  # Older versions
   - sha: 26648fd8b9e3b2fc4893a9e22c1006aaced49862
     changeNotes: Changed country alias
   - sha: 0fdd2e97529e95f4e82362b6404bbdbdb7637a86
