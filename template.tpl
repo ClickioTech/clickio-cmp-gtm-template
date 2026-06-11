@@ -10,9 +10,8 @@ ___INFO___
 
 {
   "type": "TAG",
-  "id": "cvt_temp_public_id",
+  "id": "cvt_K5MBP",
   "version": 1,
-  "securityGroups": [],
   "displayName": "Clickio Consent",
   "categories": [
     "TAG_MANAGEMENT",
@@ -27,7 +26,8 @@ ___INFO___
   "description": "The fastest way to activate Clickio Consent and Google Consent Mode v2",
   "containerContexts": [
     "WEB"
-  ]
+  ],
+  "securityGroups": []
 }
 
 
@@ -309,6 +309,14 @@ ___TEMPLATE_PARAMETERS___
         "type": "EQUALS"
       }
     ]
+  },
+  {
+    "type": "CHECKBOX",
+    "name": "addUetDefaultConsent",
+    "checkboxText": "Enable Microsoft UET support",
+    "simpleValueType": true,
+    "help": "When enabled, sends the default consent setting ad_storage: denied to UET and restores the saved ad_storage state from Clickio Consent local storage when available. This option functions correctly only when the \u0027UET Consent Mode Support\u0027 feature is activated in the Clickio Consent settings UI. ",
+    "defaultValue": false
   }
 ]
 
@@ -395,7 +403,10 @@ ___SANDBOXED_JS_FOR_WEB_TEMPLATE___
           gtagSet                = require("gtagSet"),
           setDefaultConsentState = require("setDefaultConsentState"),
           updateConsentState     = require("updateConsentState"),
-          getContainerVersion    = require("getContainerVersion");
+          getContainerVersion    = require("getContainerVersion"),
+          callInWindow           = require('callInWindow'),
+          copyFromWindow         = require('copyFromWindow'),
+          setInWindow            = require('setInWindow');
 
     //<editor-fold desc="Utils">
     /* Function to check the existence of a variable */
@@ -478,8 +489,8 @@ ___SANDBOXED_JS_FOR_WEB_TEMPLATE___
         if (data.consentScope === 'eea_uk') {
             const settingsEEAUK = createGeoAwareSettings();
 
-            setDefaultConsentState(grantedSettings); // Apply granted settings globally
             setDefaultConsentState(settingsEEAUK);   // Apply EEA/UK-specific denied settings
+            setDefaultConsentState(grantedSettings); // Apply granted settings globally
 
             dbg("Applying EEA and UK-specific denied settings and granted settings for other regions.");
         } else {
@@ -516,6 +527,42 @@ ___SANDBOXED_JS_FOR_WEB_TEMPLATE___
         }
     };
 
+    const getStoredConsentFlags = (consentDataIndex) => {
+        let consentData = localStorage.getItem("__lxG__consent__v2");
+
+        if (!consentData) {
+            return null;
+        }
+
+        consentData = JSON.parse(consentData);
+
+        if (consentData && consentData.cls_val) {
+            consentData = consentData.cls_val;
+        }
+
+        if (consentData) {
+            consentData = consentData.split("|");
+        }
+
+        if (consentData && consentData.length && checkExistence(consentData[consentDataIndex])) {
+            return consentData[consentDataIndex].split("").map(consentItem => consentItem-0);
+        }
+
+        return null;
+    };
+
+    const getLegacyConsentState = (consentFlags, consentIndex) => {
+        return checkExistence(consentFlags[consentIndex]) ? "granted" : "denied";
+    };
+
+    const getStrictConsentState = (consentFlags, consentIndex) => {
+        if (!consentFlags || "undefined" == typeof consentFlags[consentIndex]) {
+            return "denied";
+        }
+
+        return consentFlags[consentIndex] === 1 ? "granted" : "denied";
+    };
+
     const init = () => {
         if (data.enableConsentMode) {
             dbg("Consent mode enabled, initializing logic");
@@ -530,42 +577,23 @@ ___SANDBOXED_JS_FOR_WEB_TEMPLATE___
                 'developer_id.dNjAwZj': true
             });
 
-            /* Retrieving consent data from local storage */
-            let consentData = localStorage.getItem("__lxG__consent__v2");
-
             /* Checking and processing existing consent data */
-            if (consentData) {
-                consentData = JSON.parse(consentData);
+            const consentData = getStoredConsentFlags(14);
 
-                if (consentData && consentData.cls_val) {
-                    consentData = consentData.cls_val;
-                }
+            if (consentData && consentData.length) {
+                dbg("Processing existing consent data: "+consentData+"");
 
-                if (consentData) {
-                    consentData = consentData.split("|");
-                }
+                let consentObject = {};
 
-                if (consentData && consentData.length && checkExistence(consentData[14])) {
-                    dbg("Processing existing consent data: "+consentData[14]+"");
+                objectModule.values(storageItems).sort(function (storageItem1, storageItem2) {
+                    return storageItem1.serialNumber-storageItem2.serialNumber;
+                }).forEach(function (storageItem) {
+                    consentObject[storageItem.storageName] = getLegacyConsentState(consentData, storageItem.serialNumber);
+                });
 
-                    consentData = consentData[14].split("").map(consentItem => consentItem-0);
-
-                    if (consentData.length) {
-                        let consentObject = {};
-
-                        objectModule.values(storageItems).sort(function (storageItem1, storageItem2) {
-                            return storageItem1.serialNumber-storageItem2.serialNumber;
-                        }).forEach(function (storageItem) {
-                            consentObject[storageItem.storageName] = checkExistence(consentData[storageItem.serialNumber]) ? "granted" : "denied";
-                        });
-
-                        updateConsentState(consentObject);
-                    }
-                } else {
-                    dbg("Malformed consent data found, skipping");
-                }
+                updateConsentState(consentObject);
             } else {
-                dbg("Existing consent data not found");
+                dbg("Existing consent data not found or malformed, skipping");
             }
         } else {
             dbg("Consent mode disabled");
@@ -583,7 +611,24 @@ ___SANDBOXED_JS_FOR_WEB_TEMPLATE___
         } else {
             dbg("Not injecting Clickio CMP script");
         }
+      
+        // Microsoft UET Default Consent push
+        if (data.addUetDefaultConsent) {
+            dbg("Calling uetq.push");
+            if (!copyFromWindow('uetq')) {
+              setInWindow('uetq', []);
+            }
+            callInWindow('uetq.push', 'consent', 'default', { 'ad_storage': 'denied' });
 
+            const uetConsentFlags = getStoredConsentFlags(19);
+
+            if (uetConsentFlags) {
+                callInWindow('uetq.push', 'consent', 'update', {
+                    'ad_storage': getStrictConsentState(uetConsentFlags, 0)
+                });
+            }
+        }
+      
         /* Calling success callback */
         dbg("Calling gtmOnSuccess callback");
         data.gtmOnSuccess();
@@ -1040,6 +1085,106 @@ ___WEB_PERMISSIONS___
       "param": []
     },
     "isRequired": true
+  },
+  {
+    "instance": {
+      "key": {
+        "publicId": "access_globals",
+        "versionId": "1"
+      },
+      "param": [
+        {
+          "key": "keys",
+          "value": {
+            "type": 2,
+            "listItem": [
+              {
+                "type": 3,
+                "mapKey": [
+                  {
+                    "type": 1,
+                    "string": "key"
+                  },
+                  {
+                    "type": 1,
+                    "string": "read"
+                  },
+                  {
+                    "type": 1,
+                    "string": "write"
+                  },
+                  {
+                    "type": 1,
+                    "string": "execute"
+                  }
+                ],
+                "mapValue": [
+                  {
+                    "type": 1,
+                    "string": "uetq"
+                  },
+                  {
+                    "type": 8,
+                    "boolean": true
+                  },
+                  {
+                    "type": 8,
+                    "boolean": true
+                  },
+                  {
+                    "type": 8,
+                    "boolean": false
+                  }
+                ]
+              },
+              {
+                "type": 3,
+                "mapKey": [
+                  {
+                    "type": 1,
+                    "string": "key"
+                  },
+                  {
+                    "type": 1,
+                    "string": "read"
+                  },
+                  {
+                    "type": 1,
+                    "string": "write"
+                  },
+                  {
+                    "type": 1,
+                    "string": "execute"
+                  }
+                ],
+                "mapValue": [
+                  {
+                    "type": 1,
+                    "string": "uetq.push"
+                  },
+                  {
+                    "type": 8,
+                    "boolean": false
+                  },
+                  {
+                    "type": 8,
+                    "boolean": false
+                  },
+                  {
+                    "type": 8,
+                    "boolean": true
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "clientAnnotations": {
+      "isEditedByUser": true
+    },
+    "isRequired": true
   }
 ]
 
@@ -1114,6 +1259,18 @@ scenarios:
     // Verify that the tag finished successfully.
     assertApi('updateConsentState').wasCalled();
 
+    assertApi('gtmOnSuccess').wasCalled();
+- name: UET Default Consent Push
+  code: |-
+    mockData.addUetDefaultConsent = true;
+
+    const localStorage = require('localStorage');
+    localStorage.setItem("__lxG__consent__v2", '{"cls_val":"1|1715960648|1715960648292|0|1723736648292|0|0|0|1715960648292|0|17159606459671888|1|1|164B|1111111|1B2B3B4B5B6B|2|0|0|1","cls_ttl":1749656648292}');
+
+    runCode(mockData);
+
+    assertApi('callInWindow').wasCalledWith('uetq.push', 'consent', 'default', { 'ad_storage': 'denied' });
+    assertApi('callInWindow').wasCalledWith('uetq.push', 'consent', 'update', { 'ad_storage': 'granted' });
     assertApi('gtmOnSuccess').wasCalled();
 setup: |-
   // Mock data setup as a simplified example
